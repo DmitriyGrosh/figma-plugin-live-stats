@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: 'Inter', sans-serif; padding: 12px; margin: 0; font-size: 12px; }
+    label { display: block; margin-bottom: 4px; color: #333; }
+    input[type="text"] { width: 100%; box-sizing: border-box; padding: 8px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; }
+    .buttons { display: flex; gap: 8px; margin-top: 12px; }
+    button { padding: 8px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    button.primary { background: #0d99ff; color: white; }
+    button.primary:hover { background: #0b84e0; }
+    button.secondary { background: #e5e5e5; color: #333; }
+    button.secondary:hover { background: #d0d0d0; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .status { margin-top: 10px; font-size: 11px; color: #666; }
+  </style>
+</head>
+<body>
+  <label for="ws-url">WebSocket URL</label>
+  <input type="text" id="ws-url" placeholder="ws://localhost:3001" value="ws://localhost:3001">
+  <div class="buttons">
+    <button id="connect" class="primary">Подключиться</button>
+    <button id="disconnect" class="secondary" disabled>Отключиться</button>
+    <button id="mock" class="secondary" title="Подставить тестовые данные на слайд">Тест (мок)</button>
+  </div>
+  <div class="status" id="status">Не подключено</div>
+
+  <script>
+    (function () {
+      var input = document.getElementById('ws-url');
+      var connectBtn = document.getElementById('connect');
+      var disconnectBtn = document.getElementById('disconnect');
+      var statusEl = document.getElementById('status');
+      var ws = null;
+
+      function setStatus(text) {
+        statusEl.textContent = text;
+      }
+
+      function setConnected(connected) {
+        connectBtn.disabled = connected;
+        disconnectBtn.disabled = !connected;
+        input.disabled = connected;
+      }
+
+      function connect() {
+        var url = (input.value || '').trim();
+        if (!url) {
+          setStatus('Введите URL');
+          return;
+        }
+        try {
+          ws = new WebSocket(url);
+          setStatus('Подключение…');
+          ws.onopen = function () {
+            setStatus('Подключено');
+            setConnected(true);
+            parent.postMessage({ pluginMessage: { type: 'connected' } }, '*');
+          };
+          ws.onmessage = function (event) {
+            try {
+              var data = JSON.parse(event.data);
+              if (data.type === 'stats' && data.payload) {
+                parent.postMessage({ pluginMessage: { type: 'stats', payload: data.payload } }, '*');
+              }
+            } catch (e) {
+              console.warn('Invalid message', e);
+            }
+          };
+          ws.onclose = function () {
+            ws = null;
+            setStatus('Отключено');
+            setConnected(false);
+          };
+          ws.onerror = function () {
+            setStatus('Ошибка подключения');
+          };
+        } catch (e) {
+          setStatus('Ошибка: ' + (e.message || e));
+        }
+      }
+
+      function disconnect() {
+        if (ws) {
+          ws.close();
+          ws = null;
+        }
+        setStatus('Не подключено');
+        setConnected(false);
+      }
+
+      var MOCK_PAYLOAD = {
+        pollId: 'poll-1',
+        question: 'Вам понравилось выступление?',
+        optionIds: ['yes', 'no', 'maybe'],
+        optionLabels: { yes: 'Да', no: 'Нет', maybe: 'Не знаю' },
+        counts: { yes: 42, no: 10, maybe: 5 },
+        total: 57
+      };
+
+      document.getElementById('mock').onclick = function () {
+        parent.postMessage({ pluginMessage: { type: 'stats', payload: MOCK_PAYLOAD } }, '*');
+      };
+
+      connectBtn.onclick = connect;
+      disconnectBtn.onclick = disconnect;
+    })();
+  </script>
+</body>
+</html>
