@@ -14,21 +14,26 @@
     button.secondary:hover { background: #d0d0d0; }
     button:disabled { opacity: 0.6; cursor: not-allowed; }
     .status { margin-top: 10px; font-size: 11px; color: #666; }
+    .hint { margin-top: 12px; font-size: 11px; color: #888; }
   </style>
 </head>
 <body>
   <label for="ws-url">WebSocket URL</label>
   <input type="text" id="ws-url" placeholder="ws://localhost:3001" value="ws://localhost:3001">
+  <label for="poll-id">ID опроса</label>
+  <input type="text" id="poll-id" placeholder="poll-1" value="poll-1">
   <div class="buttons">
     <button id="connect" class="primary">Подключиться</button>
     <button id="disconnect" class="secondary" disabled>Отключиться</button>
-    <button id="mock" class="secondary" title="Подставить тестовые данные на слайд">Тест (мок)</button>
+    <button id="hide" class="secondary" title="Скрыть панель; плагин и подключение продолжат работать">Скрыть</button>
   </div>
   <div class="status" id="status">Не подключено</div>
+  <p class="hint">Нажмите «Скрыть», чтобы убрать панель — данные продолжат обновляться. Чтобы вернуть панель, снова запустите плагин из меню.</p>
 
   <script>
     (function () {
       var input = document.getElementById('ws-url');
+      var pollIdInput = document.getElementById('poll-id');
       var connectBtn = document.getElementById('connect');
       var disconnectBtn = document.getElementById('disconnect');
       var statusEl = document.getElementById('status');
@@ -42,6 +47,17 @@
         connectBtn.disabled = connected;
         disconnectBtn.disabled = !connected;
         input.disabled = connected;
+        pollIdInput.disabled = connected;
+      }
+
+      function saveSettings() {
+        parent.postMessage({
+          pluginMessage: {
+            type: 'saveSettings',
+            url: (input.value || '').trim(),
+            pollId: (pollIdInput.value || '').trim() || 'poll-1'
+          }
+        }, '*');
       }
 
       function connect() {
@@ -50,12 +66,15 @@
           setStatus('Введите URL');
           return;
         }
+        var pollId = (pollIdInput.value || '').trim() || 'poll-1';
         try {
           ws = new WebSocket(url);
           setStatus('Подключение…');
           ws.onopen = function () {
-            setStatus('Подключено');
+            ws.send(JSON.stringify({ type: 'subscribe', pollId: pollId }));
+            setStatus('Подключено, подписка на «' + pollId + '»');
             setConnected(true);
+            saveSettings();
             parent.postMessage({ pluginMessage: { type: 'connected' } }, '*');
           };
           ws.onmessage = function (event) {
@@ -88,20 +107,22 @@
         }
         setStatus('Не подключено');
         setConnected(false);
+        saveSettings();
       }
 
-      var MOCK_PAYLOAD = {
-        pollId: 'poll-1',
-        question: 'Вам понравилось выступление?',
-        optionIds: ['yes', 'no', 'maybe'],
-        optionLabels: { yes: 'Да', no: 'Нет', maybe: 'Не знаю' },
-        counts: { yes: 42, no: 10, maybe: 5 },
-        total: 57
+      window.onmessage = function (event) {
+        var data = event.data?.pluginMessage;
+        if (data?.type === 'settings') {
+          if (data.url != null) input.value = data.url;
+          if (data.pollId != null) pollIdInput.value = data.pollId;
+        }
       };
 
-      document.getElementById('mock').onclick = function () {
-        parent.postMessage({ pluginMessage: { type: 'stats', payload: MOCK_PAYLOAD } }, '*');
+      document.getElementById('hide').onclick = function () {
+        parent.postMessage({ pluginMessage: { type: 'hide' } }, '*');
       };
+
+      parent.postMessage({ pluginMessage: { type: 'getSettings' } }, '*');
 
       connectBtn.onclick = connect;
       disconnectBtn.onclick = disconnect;

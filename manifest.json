@@ -2,11 +2,11 @@
   "name": "Live Stats for Presentations",
   "id": "live-stats-presentations",
   "api": "1.0.0",
-  "editorType": ["figma"],
+  "editorType": ["figma", "slides"],
   "main": "code.js",
   "ui": "ui.html",
   "networkAccess": {
-    "allowedDomains": ["http://localhost:3001", "ws://localhost:3001"],
+    "allowedDomains": ["http://localhost:3001", "ws://localhost:3001", "wss://udwgrosh.local"],
     "reasoning": "Plugin connects to a WebSocket server (e.g. ws://localhost:3001) to receive live poll statistics and updates text layers on the canvas in real time for presentations.",
     "devAllowedDomains": ["http://localhost:3001", "ws://localhost:3001"]
   }

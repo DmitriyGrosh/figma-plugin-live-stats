@@ -76,9 +76,31 @@ function applyPayloadToLayers(payload) {
   });
 }
 
-figma.showUI(__html__, { width: 360, height: 220 });
+figma.showUI(__html__, { width: 360, height: 280 });
 
 figma.ui.onmessage = function (msg) {
+  if (msg.type === 'getSettings') {
+    Promise.all([
+      figma.clientStorage.getAsync('liveStats_wsUrl'),
+      figma.clientStorage.getAsync('liveStats_pollId'),
+    ]).then(function (result) {
+      figma.ui.postMessage({
+        type: 'settings',
+        url: result[0] != null ? result[0] : 'ws://localhost:3001',
+        pollId: result[1] != null ? result[1] : 'poll-1',
+      });
+    });
+    return;
+  }
+  if (msg.type === 'saveSettings') {
+    if (msg.url != null) figma.clientStorage.setAsync('liveStats_wsUrl', msg.url);
+    if (msg.pollId != null) figma.clientStorage.setAsync('liveStats_pollId', msg.pollId);
+    return;
+  }
+  if (msg.type === 'hide') {
+    figma.ui.hide();
+    return;
+  }
   if (msg.type === 'stats' && msg.payload) {
     applyPayloadToLayers(msg.payload).catch(function (err) {
       console.error('Live Stats: failed to apply payload', err);
